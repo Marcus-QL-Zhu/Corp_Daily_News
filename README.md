@@ -163,6 +163,23 @@ python src/poll.py               # 突发轮询（每 10 分钟）
 - **改提示词后必须绕过判定缓存**。缓存以 `url|title` 为 key，不清理的话新提示词不生效（这是一个反直觉的坑，本项目踩过）。
 - **突发判定和日报判定是两套提示词**，口径需人工保持同步。
 
-## 许可
+## 许可与致谢
 
-MIT。设计思路来源 AIHOT（MIT），代码独立实现。详见 [LICENSE](LICENSE)。
+本项目采用 **MIT License**（与 AIHOT 一致），全文见 [LICENSE](LICENSE)。
+
+### 与 AIHOT 的关系
+
+本项目的**设计思路**受 [AIHOT](https://github.com/KKKKhazix/AIHOT)（MIT，by KKKKhazix）启发——尤其是那个核心构想：「一个自己找热点、自己写日报的框架，把信源和精选标准换成你的，它就是你的行业热点站」。
+
+**但本项目不是 AIHOT 的 fork**，两者不共享任何源码：
+
+| | AIHOT | 本项目 |
+|---|---|---|
+| 语言 | TypeScript | Python 3.10+ |
+| 架构 | DB + API + Worker，Docker，SSR 网站 | 单进程脚本管线，无网站 |
+| 输出 | 网站 | 邮件 + 飞书 + Markdown 库 |
+| 定位 | 面向公众的行业热点站 | 面向单一企业的内部日报 |
+
+原始构想与框架思路的功劳属于 AIHOT 作者。本实现中的任何 bug 由本项目自负。
+
+如果你想要的是一个**公开的行业热点网站**，建议直接用 [AIHOT](https://github.com/KKKKhazix/AIHOT)；本项目解决的是「一家公司每天给自己人挑相关新闻」这个更窄的场景。

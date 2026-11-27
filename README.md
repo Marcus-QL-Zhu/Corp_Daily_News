@@ -63,31 +63,74 @@ export DAILY_FEISHU_OPEN_ID=ou_...    # 可选，飞书推送
 
 邮件发送依赖一个 SMTP 脚本（默认 `scripts/smtp.js`，Node）。不用邮件就改 `src/main.py` 的发信段。
 
-### 3. 改 `src/config.py`（唯一必改文件）
+### 3. 配置（不改也可先跑，想改就复制一份）
 
-六处：
+配置采用**两层加载**，不需要先删任何东西：
+
+```
+src/config_local.py    ← 你的私有配置（优先加载，已 gitignore）
+src/config.example.py  ← 完整示例（回退，clone 下来就能跑）
+```
+
+**只想先看看效果** → 什么都不做，直接用示例配置跑 `--dry`。
+
+**要改成自己的公司** →
+
+```bash
+cp src/config.example.py src/config_local.py
+# 然后只改 config_local.py，别动 config.example.py
+```
+
+`src/config.py` 是加载层，负责选文件、算派生值、启动自检，**你不需要改它**。
+
+#### config_local.py 里只需改 6 处
 
 ```python
 # ① 公司信息
-COMPANY = "示例科技"
-COMPANY_TICKER = "000000.SH"
-REPORT_NAME = "行业情报"
-SELF_ALIASES = ["示例科技", "ExampleTech"]
+COMPANY = "你的公司全称"
+COMPANY_TICKER = "000001.SH"
+REPORT_NAME = "你们日报的名字"
+SELF_ALIASES = ["公司简称", "EnglishName", "000001"]
+INDUSTRY_NAME = "你们所在的行业"
 
-# ② 产品线 / 业务线  ← 最关键，决定新闻怎么归类
+# ② 业务线 / 产品线  ← 最关键，决定新闻怎么归类
 PRODUCT_LINES = {
-    "line_a": {"name": "业务线A", "tag": "...", "kw": ["关键词1", "关键词2"]},
-    ...
+    "line_a": {"name": "业务线A", "tag": "...", "md": "...",
+               "kw": ["关键词1", "关键词2"]},
 }
 
-# ③ 竞对名录   ④ 客户名录
-COMPETITORS = {...}
-CUSTOMERS = {...}
+# ③ 竞对   ④ 客户    ⑤ 信源
+COMPETITORS = {"分组名": ["公司A", "公司B"]}
+CUSTOMERS  = {"分组名": ["客户A", "客户B"]}
+SOURCES    = [{"id": "...", "name": "...", "kind": "rss", ...}]
 
-# ⑤ 信源      SOURCES = [...]
-
-# ⑥ 播报      MAIL_TO / FEISHU_OPEN_ID / 路径
+# ⑥ 播报（也可走环境变量）
+MAIL_TO = "you@example.com"
+FEISHU_OPEN_ID = "ou_xxx"
 ```
+
+其余字段（`DISTRIBUTORS` / `POLICY_FACT_RE` / `ALERT_*` / `THRESHOLDS`）是**通用规则**，
+沿用默认即可。每个字段在 `config.example.py` 里都有「为什么需要这条」的注释。
+
+#### 启动自检
+
+配置有问题会在跑之前先告诉你，而不是跑到一半炸：
+
+```bash
+python -c "import sys;sys.path.insert(0,'src');import config;print(config.check(verbose=True))"
+```
+
+```
+配置来源: config_local.py
+公司    : 你的公司 / 你的日报
+业务线  : 6 条 ['line_a', 'line_b', ...]
+竞对/客户: 125 / 59
+信源    : 15 个（启用 14）
+输出目录: /path/to/Corp_Daily_News
+自检: OK
+```
+
+检查项包括：业务线为空、竞对为空、无信源、邮箱未配置——这四件是新人最常错的地方。
 
 ### 4. 写公司 pitch
 
@@ -115,7 +158,7 @@ python src/poll.py               # 突发轮询（每 10 分钟）
 
 ### 改造顺序（建议）
 
-**第一步：定业务线。** 打开 `src/config.py` 的 `PRODUCT_LINES`。这是整个系统的骨架——新闻按它归类，TOP5 按它排序，邮件按它分栏。填的时候只问一个问题：**你们团队是按什么分工的？** 按分工填，不要按行业教科书填。
+**第一步：定业务线。** 打开 `src/config_local.py`（还没建就先复制）的 `PRODUCT_LINES`。这是整个系统的骨架——新闻按它归类，TOP5 按它排序，邮件按它分栏。填的时候只问一个问题：**你们团队是按什么分工的？** 按分工填，不要按行业教科书填。
 
 关键词给 10-20 个，中英文都要（`"AC-DC"`, `"ACDC"`, `"电源管理"`）。宁可多，因为这一步只用于预筛，精判在后面。
 
@@ -140,20 +183,22 @@ python src/poll.py               # 突发轮询（每 10 分钟）
 
 ```
 ├── src/
-│   ├── config.py       ← 唯一必改：公司/产品线/竞对/客户/信源
-│   ├── collect.py      ← 采集：RSS + 网页列表，ETag 条件请求
-│   ├── dedup.py        ← 事件级去重：主体交集 + 字面相似
-│   ├── analyze.py      ← 判定：评分/归类/摘要/招聘素材
-│   ├── alert.py        ← 突发判定（A 类竞对动作 / B 类行业冲击）
-│   ├── main.py         ← 主流水线：采集→判定→过滤→聚簇→输出
-│   ├── poll.py         ← 突发轮询：每 10 分钟条件请求
-│   ├── render.py       ← Markdown 输出（Obsidian 兼容）
-│   ├── mail.py         ← 邮件 HTML 渲染（窄窗口自适应）
-│   ├── state.py        ← SQLite 状态：已见 URL / 历史 / 突发记录
-│   └── run_daily.py    ← 日报入口，含重试与兜底告警
+│   ├── config.py        ← 加载层：选配置、算派生值、启动自检（不用改）
+│   ├── config.example.py ← 完整可运行示例，带逐字段注释（参照这份改）
+│   ├── config_local.py  ← 你的私有配置（gitignore，自己创建）
+│   ├── collect.py       ← 采集：RSS + 网页列表，ETag 条件请求
+│   ├── dedup.py         ← 事件级去重：主体交集 + 字面相似
+│   ├── analyze.py       ← 判定：评分/归类/摘要/招聘素材
+│   ├── alert.py         ← 突发判定（A 类竞对动作 / B 类行业冲击）
+│   ├── main.py          ← 主流水线：采集→判定→过滤→聚簇→输出
+│   ├── poll.py          ← 突发轮询：每 10 分钟条件请求
+│   ├── render.py        ← Markdown 输出（Obsidian 兼容）
+│   ├── mail.py          ← 邮件 HTML 渲染（窄窗口自适应）
+│   ├── state.py         ← SQLite 状态：已见 URL / 历史 / 突发记录
+│   └── run_daily.py     ← 日报入口，含重试与兜底告警
 ├── pitch/
-│   └── company-pitch.md  ← 公司事实底座模板（必填）
-└── data/  logs/  vault/  ← 运行时生成
+│   └── company-pitch.md   ← 公司事实底座模板（必填）
+└── data/  logs/  vault/   ← 运行时生成
 ```
 
 ## 已知限制

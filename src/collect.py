@@ -163,10 +163,18 @@ def collect_one(src, etag=None, last_modified=None, timeout=20):
 
 
 def collect_all(sources, verbose=True, use_cache=False):
-    """全量抓取。use_cache=True 时带条件请求（突发轮询用）。"""
+    """全量抓取。use_cache=True 时带条件请求（突发轮询用）。
+
+    源里 enabled=False 的直接跳过，告警也不计入失败——配置留占位模板时
+    不该每天报一次抓取失败。
+    """
     import state
     out = []
     for src in sources:
+        if not src.get("enabled", True):
+            if verbose:
+                print(f"  [SKIP] {src.get('id'):16} 已禁用")
+            continue
         etag = lm = None
         if use_cache:
             etag, lm = state.get_http(src["id"])

@@ -17,3 +17,6 @@ secrets/
 
 # 系统
 .DS_Store
+
+# 使用者私有配置（从 config.example.py 复制而来）
+src/config_local.py

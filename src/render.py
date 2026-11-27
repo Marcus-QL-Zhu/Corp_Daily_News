@@ -13,10 +13,9 @@ import config
 
 BJ = timezone(timedelta(hours=8))
 
-TAG_LINE = {
-    "battery": "电池管理", "power": "电源管理", "driver": "智能驱动",
-    "sensor": "传感", "link": "传输", "mcu": "MCU",
-}
+# 业务线标签从 config.PRODUCT_LINES 的 tag 字段派生。
+# 原来硬编码六条线，README 教使用者改成 line_a/line_b 后必然 KeyError。
+TAG_LINE = config.TAG_LINE
 IMPACT_ZH = {"high": "high", "medium": "medium", "low": "low"}
 ROLE_TAG = {"竞对": "竞对", "客户": "客户", "供应链": "供应链", "政策": "政策", "行业": "行业"}
 
@@ -94,7 +93,7 @@ def write_news_md(vault, it, day=None):
 
     tags = []
     if line:
-        tags.append(f"sc/line/{TAG_LINE[line]}")
+        tags.append(f"sc/line/{TAG_LINE.get(line, line)}")
     tags.append(f"sc/type/{it.get('type', '行业动态')}")
     tags.append(f"sc/role/{ROLE_TAG.get(it.get('role'), '行业')}")
     tags.append(f"sc/impact/{IMPACT_ZH[it.get('impact', 'low')]}")

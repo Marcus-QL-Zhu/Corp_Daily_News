@@ -110,25 +110,66 @@ POLICY_FACT_RE = globals().get("POLICY_FACT_RE") or (
     r"(禁止|限制|豁免|许可|清单)(出口|进口|对华|范围)|实体清单)"
 )
 
+# ── 派生：业务线顺序与标签 ─────────────────────────────────────────────
+# 2026-11-27：原来 main.py / mail.py / render.py 三处硬编码了六条线名。
+# README 教使用者把 PRODUCT_LINES 改成 line_a / line_b，照做必然 KeyError。
+# 现在全部从 PRODUCT_LINES 派生：顺序 = dict 插入顺序，标签 = 每条线的 tag 字段。
+LINE_ORDER = list(PRODUCT_LINES.keys())
+TAG_LINE = {k: (v.get("tag") or v.get("name") or k) for k, v in PRODUCT_LINES.items()}
+LINE_NAME = {k: (v.get("name") or k) for k, v in PRODUCT_LINES.items()}
+
 # ── 派生：分组 dict → 扁平列表 ──────────────────────────────────────────
 COMPETITOR_SET = [x.strip() for v in COMPETITORS.values() for x in v if x and x.strip()]
 CUSTOMER_SET = [x.strip() for v in CUSTOMERS.values() for x in v if x and x.strip()]
 
 
 def norm_entity(name):
-    """实体名归一：同一家公司有多种叫法时统一，避免建出多个条目。"""
+    """实体名归一：同一家公司有多种叫法时统一，避免建出多个条目。
+
+    LLM 可能返回非字符串（数组、数字），这里一律当无效处理返回 None，
+    不能让它在 .strip() 上抛 AttributeError 把整条日报打挂。
+    """
+    if not name or not isinstance(name, str):
+        return None
+    name = name.strip()
     if not name:
-        return name
-    return ENTITY_ALIAS.get(name.strip(), name.strip())
+        return None
+    return ENTITY_ALIAS.get(name, name)
 
 
 # ── 派生：综合列表页降噪正则 ────────────────────────────────────────────
 # 使用者可以在配置文件里自己给 CN_VENDOR_RE；没给就自动拼。
 # 关键：必须 re.escape。公司名里的 "." "+" "(" 在正则里是元字符，
 # 不转义会变成通配符（例如 "STMicro" 里的点会匹配任意字符）。
-CN_VENDOR_RE = globals().get("CN_VENDOR_RE") or "|".join(
-    re.escape(x) for x in (list(SELF_ALIASES) + COMPETITOR_SET) if x and x.strip()
+#
+# 另外：ASCII 短名（如 "ST"、"TI"）必须加词边界，否则会匹配到单词内部
+# ——实测 "BEST Semiconductors Reports" 会因为含 "ST" 被误判为自家/竞对条目。
+def _build_vendor_re(names):
+    parts = []
+    for x in names:
+        x = x.strip()
+        if not x:
+            continue
+        esc = re.escape(x)
+        # 纯 ASCII 且较短 → 加词边界，避免嵌在别的单词里
+        if len(x) <= 3 and x.isascii():
+            parts.append(rf"(?<![A-Za-z0-9]){esc}(?![A-Za-z0-9])")
+        else:
+            parts.append(esc)
+    return "|".join(parts)
+
+
+CN_VENDOR_RE = globals().get("CN_VENDOR_RE") or _build_vendor_re(
+    list(SELF_ALIASES) + COMPETITOR_SET
 )
+
+# 配置里可以用占位符引用这个正则：SOURCES 写成 "must_match": VENDOR_RE_TOKEN，
+# 这里统一替换成真正的正则。直接写正则也可以，两者不冲突。
+_VENDOR_TOKEN = globals().get("VENDOR_RE_TOKEN")
+if _VENDOR_TOKEN:
+    for _src in globals().get("SOURCES", []):
+        if _src.get("must_match") == _VENDOR_TOKEN:
+            _src["must_match"] = CN_VENDOR_RE
 
 # ── 派生：存储路径 ──────────────────────────────────────────────────────
 BASE_DIR = globals().get("BASE_DIR") or os.path.dirname(str(_HERE))

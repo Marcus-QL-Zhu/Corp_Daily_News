@@ -45,10 +45,21 @@ def _parse_date(raw):
         return dt.astimezone(timezone.utc)
     except Exception:
         pass
+    # 2026-11-27 code review：原来的切片写法 raw[:len(fmt)+6] 对带毫秒的
+    # ISO 时间戳会截错，导致解析失败返回 None（实测
+    # "2026-11-27T10:00:00.123456+08:00" → None）。
+    # 改成 fromisoformat 优先，它能处理任意精度的小数秒。
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except Exception:
+        pass
     for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d %H:%M:%S",
                 "%Y-%m-%d", "%Y/%m/%d %H:%M", "%Y-%m-%dT%H:%M:%S.%f%z"):
         try:
-            dt = datetime.strptime(raw[:len(fmt) + 6], fmt)
+            dt = datetime.strptime(raw, fmt)
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=timezone.utc)
             return dt.astimezone(timezone.utc)

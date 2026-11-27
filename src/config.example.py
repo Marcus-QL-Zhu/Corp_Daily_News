@@ -259,17 +259,15 @@ CUSTOMERS = {
 # tier 含义：T1 = 一手/权威（官网、公告），T2 = 行业媒体。
 # 门槛按 tier 分档，见 THRESHOLDS。
 #
-# 综合列表页的降噪正则：只收「自家 + 竞对」的条目。
-# 自动由 SELF_ALIASES 和竞对名录拼成，不用手改。
-# 注意：正则里有特殊字符（如 . + ( )），拼进去前必须转义，否则会变成通配符。
-CN_VENDOR_RE = "|".join(
-    re.escape(x.strip())
-    for x in (
-        [a.strip() for a in SELF_ALIASES if a.strip()]
-        + [c.strip() for v in COMPETITORS.values() for c in v if c.strip()]
-    )
-    if x.strip()
-)
+# 综合列表页的降噪正则，用占位符代替。
+#
+# 不在这里直接拼——config.py 会统一从 SELF_ALIASES + 竞对名录派生，
+# 并给短 ASCII 名（ST / TI 等）加词边界，避免 "BEST Semiconductors" 这类
+# 单词内部误命中。config.py 加载完本文件后，会把下面 SOURCES 里的
+# VENDOR_RE_TOKEN 替换成真正的正则。
+#
+# 你想改筛选范围，改 SELF_ALIASES / COMPETITORS 即可，不用动这里。
+VENDOR_RE_TOKEN = "__CN_VENDOR_RE__"
 
 # ⚠️ 下面 15 个源自带可用配置（模拟芯片行业），中文源已实测可达。
 #    换成你自己的行业时，把不适用的删掉，加上你行业的垂直媒体。
@@ -327,15 +325,15 @@ SOURCES = [
     {"id": "eetrend_new", "name": "电子创新网·新品", "kind": "web_list", "tier": "T2",
      "url": "https://www.eetrend.com/newproduct.html", "interval": 240,
      "pattern": r"/content/20\d\d-\d\d/", "base": "https://www.eetrend.com",
-     "must_match": CN_VENDOR_RE},
+     "must_match": VENDOR_RE_TOKEN},
     {"id": "cntronics_new", "name": "电子元件技术网·新品", "kind": "web_list", "tier": "T2",
      "url": "http://www.cntronics.com/cp-art/product", "interval": 240,
      "pattern": r"/industry/new-products/", "base": "http://www.cntronics.com",
-     "must_match": CN_VENDOR_RE},
+     "must_match": VENDOR_RE_TOKEN},
     {"id": "eccn_new", "name": "中电网·产品", "kind": "web_list", "tier": "T2",
      "url": "http://products.eccn.com/", "interval": 240,
      "pattern": r"products_\d+\.htm", "base": "",
-     "must_match": CN_VENDOR_RE},
+     "must_match": VENDOR_RE_TOKEN},
 ]
 
 

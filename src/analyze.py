@@ -35,7 +35,12 @@ def _post(payload, retries=3, timeout=90):
         except Exception as e:
             last = e
             time.sleep(2 * (i + 1))
-    raise last
+    # S3（2026-11-27 code review）：原来写 raise last，而 last 初始为 None，
+    # 全部重试耗尽时会抛 TypeError: exceptions must derive from BaseException
+    # ——真正的错误（429 限流/超时）被吞掉，调用方看到的是无意义的 TypeError。
+    if last is not None:
+        raise last
+    raise RuntimeError(f"LLM 调用失败（已重试 {retries} 次），且未捕获到具体异常")
 
 
 def _extract_json(text):
@@ -203,11 +208,25 @@ def analyze_all(cfg, items, batch_size=8):
                 r = analyze_one(cfg, it)
                 res.append(r or {})
         for it, r in zip(batch, res):
-            if not isinstance(r, dict):
-                r = {}
+            # S2（2026-11-27 code review）：判定失败时 r 是空 dict，
+            # 之前照样写进缓存 —— 之后该 URL 永远命中缓存、永远 keep=False，
+            # 模型恢复也救不回来（实测：失败后重跑仍判为丢弃）。
+            # 现在：失败不写缓存，下次重跑会重新判定。
+            if not isinstance(r, dict) or not r:
+                print(f"      ! 判定失败，不写缓存：{(it.get('title') or '')[:30]}")
+                continue
+            # S3：LLM 输出类型不可信，int() 与 norm_entity 都要兜底。
+            # "score": "45分" → ValueError；"competitor_hit": ["TI"] → AttributeError。
+            # 这两个异常原本在 try 之外，会一路冒泡到 main.run() 让日报整个挂掉。
+            try:
+                score = int(r.get("score") or 0)
+            except (TypeError, ValueError):
+                score = 0
+            entities = [cfg.norm_entity(x) for x in (r.get("entities") or [])
+                        if isinstance(x, str)]
             it.update({
                 "keep": bool(r.get("keep", False)),
-                "score": int(r.get("score") or 0),
+                "score": score,
                 "line": r.get("line") if r.get("line") in cfg.PRODUCT_LINES else None,
                 "line_secondary": [x for x in (r.get("line_secondary") or [])
                                    if x in cfg.PRODUCT_LINES],
@@ -218,8 +237,7 @@ def analyze_all(cfg, items, batch_size=8):
                           ("high", "medium", "low") else "low",
                 "title_zh": (r.get("title_zh") or it["title"])[:60],
                 "summary": (r.get("summary") or "")[:200],
-                "entities": [cfg.norm_entity(x) for x in (r.get("entities") or [])
-                             if isinstance(x, str)][:4],
+                "entities": [e for e in entities if e][:4],
                 "competitor_hit": cfg.norm_entity(r.get("competitor_hit")),
                 "customer_hit": cfg.norm_entity(r.get("customer_hit")),
             })
@@ -249,6 +267,19 @@ def _load_pitch():
     cut = text.find("## 八、")
     if cut > 0:
         text = text[:cut]
+    # 2026-11-27 code review：模板里有 86 处 {{占位符}}。使用者还没填完时，
+    # 这些占位符会原样喂给模型，它会拿「{{公司名}}」当事实去编理由。
+    # 清除占位符本身，再丢掉因此变空的行——保留同一行里的真实内容。
+    if "{{" in text:
+        text = re.sub(r"\{\{[^}]*\}\}", "", text)
+        kept = []
+        for ln in text.splitlines():
+            # 清完后没有实质内容（只剩标点/空白）的行丢掉
+            if ln.strip() and not re.search(r"[\w一-鿿]", ln):
+                continue
+            kept.append(ln)
+        text = "\n".join(kept)
+        print("    ! pitch 含未填占位符，已剔除（请补全 pitch/company-pitch.md）")
     return text.strip()
 
 

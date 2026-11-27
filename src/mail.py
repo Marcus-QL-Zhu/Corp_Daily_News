@@ -7,7 +7,7 @@ from datetime import datetime
 
 import config
 
-LINE_ORDER = ["battery", "power", "driver", "sensor", "link", "mcu"]
+LINE_ORDER = config.LINE_ORDER
 IMPACT_COLOR = {"high": "#c8102e", "medium": "#d48806", "low": "#8c8c8c"}
 IMPACT_ZH = {"high": "高", "medium": "中", "low": "低"}
 

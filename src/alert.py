@@ -186,6 +186,12 @@ def judge_alerts(new_items, api_key=None, model="deepseek-chat", max_n=15,
         if not isinstance(arr, list):
             return ([], []) if return_judged else []
         out = []
+        # S5（2026-11-27 code review）：judged 之前直接返回整个 batch。
+        # 但模型可能只返回部分结论（实测输入 5 条、只回 2 条），
+        # 剩下 3 条其实没被判定，却会被 poll.py 当成「已判定」mark_seen
+        # —— 永久标记为已见，之后再也不会出现，等于静默丢稿。
+        # 现在只把真正拿到结论的那几条算作 judged。
+        judged = batch[:len(arr)]
         for it, verdict in zip(batch, arr):
             if not isinstance(verdict, dict) or not verdict.get("alert"):
                 continue
@@ -198,7 +204,10 @@ def judge_alerts(new_items, api_key=None, model="deepseek-chat", max_n=15,
                 "line": verdict.get("line"),
                 "topic": (verdict.get("topic") or "")[:40] or None,
             })
-        return (out, batch) if return_judged else out
+        if return_judged and len(judged) < len(batch):
+            print(f"    ! 模型只给了 {len(judged)}/{len(batch)} 条结论，"
+                  f"余 {len(batch)-len(judged)} 条留到下一轮")
+        return (out, judged) if return_judged else out
     except Exception as e:
         print(f"  ! judge_alerts fail: {type(e).__name__} {str(e)[:80]}")
         return ([], []) if return_judged else []

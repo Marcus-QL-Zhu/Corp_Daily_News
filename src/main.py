@@ -23,7 +23,9 @@ import render
 import state
 
 BJ = timezone(timedelta(hours=8))
-LINE_ORDER = ["battery", "power", "driver", "sensor", "link", "mcu"]
+# 业务线顺序从 config.PRODUCT_LINES 派生（dict 插入顺序）。
+# 原来在这里硬编码六条线，README 教使用者改成 line_a/line_b 后必然 KeyError。
+LINE_ORDER = config.LINE_ORDER
 
 
 # ── 判重 ────────────────────────────────────────────────────────────────
@@ -463,9 +465,17 @@ def run(send=True, day=None):
     print(f"[4.1] 渠道稿过滤：丢 {len(dist_dropped)} 条")
 
     # 4.2 政策实质门：政策类必须能指到具体事实（数字/日期/条款/禁令）
-    pol_dropped = [it for it in items if it.get("keep") and not policy_has_substance(it)]
+    # 已判突发的条目跳过这道门：突发判定本身比日报评分严（只认 A/B 两类），
+    # 且合成条目的 summary 是标题+线索，本就不含法规细节。否则突发接续
+    # 会被这道门全灭——实测一条都进不了日报。
+    def policy_drop(it):
+        if it.get("_carried"):
+            return False
+        return bool(it.get("keep")) and not policy_has_substance(it)
+
+    pol_dropped = [it for it in items if policy_drop(it)]
     if pol_dropped:
-        items = [it for it in items if not (it.get("keep") and not policy_has_substance(it))]
+        items = [it for it in items if not policy_drop(it)]
         for d in pol_dropped[:5]:
             print(f"      丢 政策无实质      {(d.get('title_zh') or '')[:34]}")
     print(f"[4.2] 政策实质门：丢 {len(pol_dropped)} 条")

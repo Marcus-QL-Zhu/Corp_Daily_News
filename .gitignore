@@ -1,0 +1,19 @@
+# 运行时
+data/
+logs/
+vault/
+build/out-*.html
+__pycache__/
+*.pyc
+
+# 密钥与本地配置
+.env
+*.env
+secrets/
+
+# 备份
+*.bak
+*.bak.*
+
+# 系统
+.DS_Store

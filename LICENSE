@@ -1,0 +1,47 @@
+MIT License
+
+Copyright (c) 2026 Corp_Daily_News contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+## Attribution note / 致谢与来源说明
+
+This project's **design thinking** was inspired by
+[AIHOT](https://github.com/KKKKhazix/AIHOT) (MIT License, by KKKKhazix) —
+specifically the idea of "a framework that finds its own hot topics and writes
+your daily briefing; swap the sources and selection criteria, and it becomes
+your industry's news site."
+
+**This codebase is an independent implementation, not a fork of AIHOT.**
+It shares no source code with AIHOT:
+
+| | AIHOT | This project |
+|---|---|---|
+| Language | TypeScript | Python 3.11 |
+| Architecture | DB + API + Worker, Docker, SSR web | Single-process script pipeline, no web |
+| Output | Website | Email + Feishu + Markdown vault |
+| Positioning | Public industry hotspot site | Internal daily briefing for one company |
+
+Credit for the original concept belongs to AIHOT's author. Any bugs in this
+implementation are ours alone.
+
+本项目**设计思路**受 [AIHOT](https://github.com/KKKKhazix/AIHOT)（MIT）启发，
+但代码为独立实现，**不是 AIHOT 的 fork**，两者不共享任何源码。
